@@ -169,9 +169,9 @@ class CausalSelfAttention(nn.Module):
         super().__init__()
         assert config.n_embd % config.n_head == 0
         # key, query, value projections for all heads, but in a batch
-        self.c_attn = YatDense(config.n_embd, 3 * config.n_embd, bias=config.bias)
+        self.c_attn = YatDense(config.n_embd, 3 * config.n_embd)
         # output projection
-        self.c_proj = YatDense(config.n_embd, config.n_embd, bias=config.bias)
+        self.c_proj = YatDense(config.n_embd, config.n_embd)
         # regularization
         self.attn_dropout = nn.Dropout(config.dropout)
         self.resid_dropout = nn.Dropout(config.dropout)
@@ -216,9 +216,9 @@ class MLP(nn.Module):
 
     def __init__(self, config):
         super().__init__()
-        self.c_fc    = YatDense(config.n_embd, 4 * config.n_embd, bias=config.bias)
+        self.c_fc    = YatDense(config.n_embd, 4 * config.n_embd)
         self.gelu    = nn.GELU()
-        self.c_proj  = YatDense(4 * config.n_embd, config.n_embd, bias=config.bias)
+        self.c_proj  = YatDense(4 * config.n_embd, config.n_embd)
         self.dropout = nn.Dropout(config.dropout)
 
     def forward(self, x):
@@ -231,9 +231,9 @@ class Block(nn.Module):
 
     def __init__(self, config):
         super().__init__()
-        self.ln_1 = LayerNorm(config.n_embd, bias=config.bias)
+        self.ln_1 = LayerNorm(config.n_embd)
         self.attn = CausalSelfAttention(config)
-        self.ln_2 = LayerNorm(config.n_embd, bias=config.bias)
+        self.ln_2 = LayerNorm(config.n_embds)
         self.mlp = MLP(config)
 
     def forward(self, x):
@@ -264,7 +264,7 @@ class GPT(nn.Module):
             wpe = nn.Embedding(config.block_size, config.n_embd),
             drop = nn.Dropout(config.dropout),
             h = nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
-            ln_f = LayerNorm(config.n_embd, bias=config.bias),
+            ln_f = LayerNorm(config.n_embd),
         ))
         self.lm_head = YatDense(config.n_embd, config.vocab_size, bias=False)
         # with weight tying when using torch.compile() some warnings get generated:
