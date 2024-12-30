@@ -127,13 +127,14 @@ class YatDense(nn.Module):
         # Apply squared Euclidean distance transformation
         y = y ** 2 / (distances + self.epsilon)
 
-        # Dynamic scaling
-        scale = (math.sqrt(self.out_features) / math.log(1 + self.out_features)) ** self.alpha
-        y = y * scale
-
         # Add bias if used
         if self.use_bias:
             y += self.bias
+
+
+        # Dynamic scaling
+        scale = (math.sqrt(self.out_features) / math.log(1 + self.out_features)) ** self.alpha
+        y = y * scale
 
         return y
 
@@ -151,17 +152,6 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-
-class LayerNorm(nn.Module):
-    """ LayerNorm but with an optional bias. PyTorch doesn't support simply bias=False """
-
-    def __init__(self, ndim, bias):
-        super().__init__()
-        self.weight = nn.Parameter(torch.ones(ndim))
-        self.bias = nn.Parameter(torch.zeros(ndim)) if bias else None
-
-    def forward(self, input):
-        return F.layer_norm(input, self.weight.shape, self.weight, self.bias, 1e-5)
 
 class CausalSelfAttention(nn.Module):
 
@@ -217,7 +207,6 @@ class MLP(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.c_fc    = YatDense(config.n_embd, 4 * config.n_embd)
-        self.gelu    = nn.GELU()
         self.c_proj  = YatDense(4 * config.n_embd, config.n_embd)
         self.dropout = nn.Dropout(config.dropout)
 
@@ -231,14 +220,12 @@ class Block(nn.Module):
 
     def __init__(self, config):
         super().__init__()
-        self.ln_1 = LayerNorm(config.n_embd, bias=config.bias)
         self.attn = CausalSelfAttention(config)
-        self.ln_2 = LayerNorm(config.n_embd, bias=config.bias)
         self.mlp = MLP(config)
 
     def forward(self, x):
-        x = x + self.attn(self.ln_1(x))
-        x = x + self.mlp(self.ln_2(x))
+        x = x + self.attn(x)
+        x = x + self.mlp(x)
         return x
 
 @dataclass
@@ -264,9 +251,8 @@ class GPT(nn.Module):
             wpe = nn.Embedding(config.block_size, config.n_embd),
             drop = nn.Dropout(config.dropout),
             h = nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
-            ln_f = LayerNorm(config.n_embd, bias=False),
         ))
-        self.lm_head = YatDense(config.n_embd, config.vocab_size)
+        self.lm_head = YatDense(config.n_embd, config.vocab_size, use_bias=False)
         # with weight tying when using torch.compile() some warnings get generated:
         # "UserWarning: functional_call was passed multiple values for tied weights.
         # This behavior is deprecated and will be an error in future versions"
